@@ -1,0 +1,453 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# rest-api-webclient — application.yml
+#
+# PRINCIPLE: no sensitive values hardcoded here.
+# Everything via environment variables with local development defaults.
+# In production, define real values without defaults.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+server:
+  port: ${SERVER_PORT:8080}
+
+spring:
+  application:
+    name: rest-api-webclient
+
+  # ─── CACHING (Caffeine) ───────────────────────────────────────────────────
+  #
+  # PERFORMANCE: @Cacheable on the service methods stores results in an
+  # in-memory Caffeine cache. A cache HIT returns instantly and skips the
+  # external HTTP call entirely (and therefore skips Retry + Circuit Breaker).
+  #
+  # cache-names   → the caches used by @Cacheable("posts") and @Cacheable("postById")
+  # caffeine.spec → tuning:
+  #     maximumSize=500       → keep at most 500 entries per cache (LRU eviction)
+  #     expireAfterWrite=60s  → entries expire 60s after being written
+  #                             (so stale data from the external API is bounded)
+  #     recordStats           → expose hit/miss stats via /actuator/metrics
+  #
+  # MIGRATION TO REDIS (shared cache across multiple instances in production):
+  #   1. pom.xml: replace 'caffeine' with 'spring-boot-starter-data-redis'
+  #   2. Start Redis:  docker run -d -p 6379:6379 redis
+  #   3. Replace this block with:
+  #        spring.cache.type: redis
+  #        spring.data.redis.host: ${REDIS_HOST:localhost}
+  #        spring.data.redis.port: ${REDIS_PORT:6379}
+  #   The @Cacheable annotations in the code stay EXACTLY the same.
+  cache:
+    cache-names: posts,postById
+    caffeine:
+      spec: maximumSize=500,expireAfterWrite=60s,recordStats
+
+  # ─── VIRTUAL THREADS (Java 21+) ───────────────────────────────────────────
+  #
+  # [JAVA 21 PERFORMANCE NOTE — disabled here because this project targets Java 17]
+  #
+  # This application is I/O-bound: every /posts call blocks a thread while it
+  # waits for the external API (WebClient .block()). On the default Tomcat
+  # thread pool, a few hundred slow concurrent requests can exhaust all threads
+  # and stall the whole app.
+  #
+  # On JAVA 21, enabling virtual threads makes each request run on a lightweight
+  # JVM-managed thread instead of a scarce OS thread. The app can then handle
+  # thousands of concurrent blocking calls with minimal memory — a major
+  # performance improvement for this exact workload, with a single line:
+  #
+  #   threads:
+  #     virtual:
+  #       enabled: true
+  #
+  # Requires: Java 21 + Spring Boot 3.2+. Change <java.version> to 21 in pom.xml
+  # first, then uncomment the block above.
+
+# ─── EXTERNAL API BASE URL ────────────────────────────────────────────────────
+#
+# WebClientConfig reads this property via @Value("${externalApi.base-url}")
+# to set the base URL for all outbound HTTP calls.
+#
+# Override in production with an environment variable:
+#   EXTERNAL_API_BASE_URL=https://api.real-service.com
+#
+externalApi:
+  base-url: ${EXTERNAL_API_BASE_URL:https://jsonplaceholder.typicode.com}
+
+# ─── RESILIENCE4J ─────────────────────────────────────────────────────────────
+#
+# Resilience4j protects your app when external APIs fail or are slow.
+# Two mechanisms work together:
+#
+#   1. RETRY          → retries a failed call automatically before giving up
+#   2. CIRCUIT BREAKER → stops calling the external API when too many calls fail
+#
+# They are applied via annotations on the service methods:
+#   @Retry(name = "externalApi")
+#   @CircuitBreaker(name = "externalApi", fallbackMethod = "...")
+#
+# The "name" must match the instance key defined below.
+#
+# ASPECT ORDER (which wraps which):
+#   Retry ( CircuitBreaker ( RateLimiter ( TimeLimiter ( Bulkhead ( Function ) ) ) ) )
+#   Retry is the OUTERMOST layer → it runs first, Circuit Breaker runs second.
+#   This means the entire retry cycle (all attempts) counts as ONE call for the CB.
+#
+# You can override the aspect order if needed:
+#   resilience4j.retry.retry-aspect-order: 2
+#   resilience4j.circuitbreaker.circuit-breaker-aspect-order: 1
+#
+resilience4j:
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # ── RETRY ───────────────────────────────────────────────────────────────────
+  # ═══════════════════════════════════════════════════════════════════════════
+  #
+  # HOW RETRY WORKS:
+  #
+  #   @Retry wraps the method call. When the method throws a retryable exception:
+  #     1. Resilience4j catches the exception
+  #     2. Waits for wait-duration (or calculated interval if backoff is enabled)
+  #     3. Calls the method again
+  #     4. Repeats until max-attempts is reached
+  #     5. If the last attempt also fails → exception propagates to @CircuitBreaker
+  #
+  #   Timeline (max-attempts=3, wait-duration=500ms, no backoff):
+  #
+  #     t=0ms    → Attempt 1 → throws IOException
+  #     t=500ms  → Attempt 2 → throws IOException   ← waited 500ms
+  #     t=1000ms → Attempt 3 → throws IOException   ← waited 500ms
+  #     t=1000ms → retries exhausted → @CircuitBreaker records ONE failure
+  #
+  #   Timeline (max-attempts=3, exponential backoff, multiplier=2, base=500ms):
+  #
+  #     t=0ms     → Attempt 1 → throws IOException
+  #     t=500ms   → Attempt 2 → throws IOException   ← waited 500ms (500 × 2^0)
+  #     t=1500ms  → Attempt 3 → throws IOException   ← waited 1000ms (500 × 2^1)
+  #     t=1500ms  → retries exhausted → @CircuitBreaker records ONE failure
+  #
+  #   IMPORTANT: the entire retry cycle counts as ONE failure for the circuit
+  #   breaker, not three. The CB sees the outcome of the whole retry sequence.
+  #
+  # ── ALL RETRY PROPERTIES ───────────────────────────────────────────────────
+  #
+  # Property                              | Default   | Description
+  # --------------------------------------+-----------+------------------------------------------
+  # max-attempts                          | 3         | Total attempts including the first call
+  # wait-duration                          | 500ms     | Fixed wait between attempts
+  # enable-exponential-backoff             | false     | Multiply wait by a factor each attempt
+  # exponential-backoff-multiplier         | 2.0       | Multiplier for exponential backoff
+  # exponential-max-wait-duration          | ?         | Cap for exponential backoff wait
+  # enable-randomized-wait                | false     | Add randomness to wait duration
+  # randomized-factor                     | 0.5       | Randomization factor (0.0–1.0)
+  # retry-exceptions                      | empty     | Exceptions that trigger a retry
+  # ignore-exceptions                     | empty     | Exceptions that are NOT retried
+  # fail-after-max-attempts               | false     | Throw MaxRetriesExceededException
+  # writable-stack-trace-enabled          | true      | Include stack trace in exception
+  #
+  # NOTE: retry-on-result-predicate and retry-exception-predicate are Java
+  # lambdas and cannot be set in YAML. Use RetryConfigCustomizer beans instead.
+  #
+  retry:
+    instances:
+      externalApi:                        # matches @Retry(name = "externalApi")
+
+        # ── BASIC ──────────────────────────────────────────────────────────
+        # Total number of attempts including the first one.
+        # Default: 3
+        # Example: max-attempts=5 → 1 initial call + 4 retries
+        max-attempts: 3
+
+        # Fixed wait duration between retry attempts.
+        # Default: 500ms
+        # Accepted units: ns, ms, s, m, h (e.g. 500ms, 2s, 1m)
+        wait-duration: 500ms
+
+        # ── EXPONENTIAL BACKOFF ────────────────────────────────────────────
+        # When true, each retry waits longer than the previous one.
+        # Formula: wait = wait-duration × (multiplier ^ (attempt - 1))
+        # Default: false
+        enable-exponential-backoff: false
+
+        # Multiplier applied to the wait duration on each retry.
+        # Only used when enable-exponential-backoff is true.
+        # Default: 2.0
+        # Example: base=500ms, multiplier=2 → 500ms, 1000ms, 2000ms, 4000ms...
+        exponential-backoff-multiplier: 2.0
+
+        # Maximum wait duration when exponential backoff is enabled.
+        # Prevents the wait from growing indefinitely.
+        # Default: no cap (wait can grow without limit)
+        # Example: exponential-max-wait-duration: 10s
+        # → 500ms, 1000ms, 2000ms, 4000ms, 8000ms, 10000ms, 10000ms (capped)
+        # exponential-max-wait-duration: 10s
+
+        # ── RANDOMIZED WAIT ────────────────────────────────────────────────
+        # When true, adds randomness to the wait duration to avoid
+        # "thundering herd" — multiple clients retrying at the exact same
+        # moment and overwhelming the server again.
+        # Default: false
+        enable-randomized-wait: false
+
+        # Randomization factor between 0.0 and 1.0.
+        # Only used when enable-randomized-wait is true.
+        # Formula: actual-wait = wait × (1 + randomized-factor × random(-1, 1))
+        # Default: 0.5
+        # Example: wait=1000ms, factor=0.5 → actual wait between 500ms and 1500ms
+        randomized-factor: 0.5
+
+        # ── EXCEPTION FILTERING ────────────────────────────────────────────
+        # Only exceptions listed here trigger a retry.
+        # Exceptions NOT listed here (e.g. 400 Bad Request) will NOT be retried
+        # because retrying a malformed request will never succeed.
+        # Default: empty (any exception is retried if not ignored)
+        # Supports subtyping: a subclass of a listed exception also triggers retry.
+        retry-exceptions:
+          - java.io.IOException
+          - java.util.concurrent.TimeoutException
+          - org.springframework.web.reactive.function.client.WebClientRequestException
+
+        # Exceptions listed here are ignored and never trigger a retry,
+        # even if they are a subclass of something in retry-exceptions.
+        # Default: empty
+        # Example: ignore business exceptions that should not be retried
+        # ignore-exceptions:
+        #   - com.example.webclient.exception.BusinessException
+
+        # ── ADVANCED ───────────────────────────────────────────────────────
+        # When true, throws MaxRetriesExceededException after max-attempts
+        # if the result still does not pass retry-on-result-predicate.
+        # When false, silently returns the last result without throwing.
+        # Default: false
+        fail-after-max-attempts: false
+
+        # When true, the MaxRetriesExceededException includes the full
+        # stack trace. Set to false in production to reduce log noise
+        # and memory allocation on each exception.
+        # Default: true
+        writable-stack-trace-enabled: true
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # ── CIRCUIT BREAKER ─────────────────────────────────────────────────────────
+  # ═══════════════════════════════════════════════════════════════════════════
+  #
+  # HOW CIRCUIT BREAKER WORKS:
+  #
+  #   @CircuitBreaker wraps the method call and tracks outcomes in a sliding
+  #   window. When the failure rate crosses failure-rate-threshold → circuit OPENS.
+  #
+  #   States:
+  #     CLOSED      → normal, all calls go through to WebClient              ✅
+  #     OPEN        → blocked, all calls go directly to fallbackMethod      ❌
+  #     HALF_OPEN   → test mode, allows a few calls to check recovery       🔄
+  #     DISABLED    → special state, always allows calls (no metrics)       ⬜
+  #     FORCED_OPEN → special state, always denies calls (no metrics)       🔒
+  #     METRICS_ONLY→ special state, allows calls but never opens circuit   📊
+  #
+  #   State transition diagram:
+  #
+  #       CLOSED ──(failure rate ≥ threshold)──→ OPEN
+  #         ↑                                      │
+  #         │                                  wait 30s
+  #         │                                      │
+  #         │                                      ▼
+  #     (probes OK)                          HALF_OPEN (3 probe calls)
+  #         │                                      │
+  #         └──────────────────────────────────────┘
+  #                             (any probe fails → back to OPEN)
+  #
+  #   Relationship with @Retry:
+  #     Each complete retry cycle (all attempts exhausted) = ONE failure.
+  #     With max-attempts=3 and failure-rate-threshold=50 on a 10-call window:
+  #     the circuit opens after 5 full retry cycles (= 15 actual HTTP requests).
+  #
+  # ── ALL CIRCUIT BREAKER PROPERTIES ──────────────────────────────────────────
+  #
+  # Property                                   | Default  | Description
+  # -------------------------------------------+----------+-----------------------------------------
+  # failure-rate-threshold                     | 50       | % of failures that opens the circuit
+  # slow-call-rate-threshold                   | 100      | % of slow calls that opens the circuit
+  # slow-call-duration-threshold               | 60000ms  | Duration above which a call is "slow"
+  # permitted-number-of-calls-in-half-open-state| 10       | Probe calls allowed in HALF_OPEN
+  # max-wait-duration-in-half-open-state        | 0ms      | Max time in HALF_OPEN (0 = infinite)
+  # sliding-window-type                        | COUNT_BASED | COUNT_BASED or TIME_BASED
+  # sliding-window-size                        | 100      | Window size (calls or seconds)
+  # minimum-number-of-calls                    | 100      | Min calls before evaluating thresholds
+  # wait-duration-in-open-state                | 60000ms  | Time OPEN before → HALF_OPEN
+  # automatic-transition-from-open-to-half-open-enabled| false | Auto transition without a call
+  # record-exceptions                          | empty    | Exceptions counted as failures
+  # ignore-exceptions                          | empty    | Exceptions that don't count at all
+  # register-health-indicator                  | false    | Expose state in /actuator/health
+  # event-consumer-buffer-size                 | 100      | Buffer size for event storage
+  # writable-stack-trace-enabled               | true     | Stack trace in CallNotPermittedException
+  #
+  # NOTE: record-failure-predicate and ignore-exception-predicate are Java
+  # lambdas. In YAML you can specify a fully-qualified class name that
+  # implements the Predicate<Throwable> interface (must have a no-arg
+  # constructor), or use CircuitBreakerConfigCustomizer beans.
+  #
+  circuit-breaker:
+    instances:
+      externalApi:                        # matches @CircuitBreaker(name = "externalApi")
+
+        # ── THRESHOLDS ─────────────────────────────────────────────────────
+        # Failure rate (percentage) that triggers the circuit to OPEN.
+        # When the calculated failure rate is ≥ this value → OPEN.
+        # Default: 50
+        # Range: 0–100
+        # Example: 50 → circuit opens if 5+ out of 10 calls failed
+        failure-rate-threshold: 50
+
+        # Percentage of slow calls that triggers the circuit to OPEN.
+        # A call is "slow" if it takes longer than slow-call-duration-threshold.
+        # Default: 100 (disabled in practice — never trips on slow calls alone)
+        # Range: 0–100
+        # Example: 80 → circuit opens if 8+ out of 10 calls were slow
+        slow-call-rate-threshold: 80
+
+        # Duration above which a call is considered "slow".
+        # Slow calls increment the slow-call counter used by slow-call-rate-threshold.
+        # Default: 60000ms (60 seconds)
+        # Accepted units: ns, ms, s, m, h
+        # Example: 3s → any call taking more than 3 seconds is "slow"
+        slow-call-duration-threshold: 3s
+
+        # ── SLIDING WINDOW ────────────────────────────────────────────────
+        # Type of sliding window used to record call outcomes.
+        # Default: COUNT_BASED
+        # Options:
+        #   COUNT_BASED → evaluate the last N calls (sliding-window-size = number of calls)
+        #   TIME_BASED  → evaluate calls in the last N seconds (sliding-window-size = seconds)
+        sliding-window-type: COUNT_BASED
+
+        # Size of the sliding window.
+        # For COUNT_BASED: number of calls to evaluate (e.g. 10 = last 10 calls).
+        # For TIME_BASED: number of seconds to evaluate (e.g. 10 = last 10 seconds).
+        # Default: 100
+        sliding-window-size: 10
+
+        # Minimum number of calls required before the CircuitBreaker can
+        # calculate the error rate. The circuit will NOT open before this
+        # many calls have been recorded, even if all of them failed.
+        # Default: 100
+        # Example: 5 → evaluate after 5 calls, not 10
+        minimum-number-of-calls: 5
+
+        # ── OPEN STATE ─────────────────────────────────────────────────────
+        # How long the circuit stays OPEN before transitioning to HALF_OPEN.
+        # During this time ALL calls skip WebClient and go to the fallback.
+        # Default: 60000ms (60 seconds)
+        # Accepted units: ns, ms, s, m, h
+        wait-duration-in-open-state: 30s
+
+        # ── HALF_OPEN STATE ───────────────────────────────────────────────
+        # Number of probe calls allowed through in HALF_OPEN state.
+        # All succeed → circuit returns to CLOSED.
+        # Any fails   → circuit goes back to OPEN for another wait-duration.
+        # Default: 10
+        permitted-number-of-calls-in-half-open-state: 3
+
+        # Maximum duration the circuit can stay in HALF_OPEN before it
+        # transitions back to OPEN (if not all probes completed).
+        # Default: 0 (wait infinitely until all probes complete)
+        # Example: 10s → if probes don't complete in 10s, go back to OPEN
+        # max-wait-duration-in-half-open-state: 0
+
+        # When true, the circuit automatically transitions from OPEN to
+        # HALF_OPEN after wait-duration-in-open-state, without needing a
+        # call to trigger it. A background thread monitors all circuit
+        # breakers. When false, the transition only happens when a call
+        # is made (even after wait-duration has passed).
+        # Default: false
+        # automatic-transition-from-open-to-half-open-enabled: false
+
+        # ── EXCEPTION FILTERING ───────────────────────────────────────────
+        # List of exceptions that are recorded as failures and increase
+        # the failure rate. Supports subtyping (subclasses also count).
+        # If you specify a list, all OTHER exceptions count as success,
+        # unless explicitly ignored by ignore-exceptions.
+        # Default: empty (all exceptions count as failures)
+        # record-exceptions:
+        #   - java.io.IOException
+        #   - java.util.concurrent.TimeoutException
+
+        # List of exceptions that are ignored — they neither count as
+        # failure nor success. They are completely invisible to the CB.
+        # Takes precedence over record-exceptions.
+        # Default: empty
+        # ignore-exceptions:
+        #   - com.example.webclient.exception.BusinessException
+
+        # ── HEALTH & EVENTS ────────────────────────────────────────────────
+        # When true, exposes the circuit breaker state in /actuator/health.
+        # CLOSED → UP, OPEN → DOWN, HALF_OPEN → UNKNOWN.
+        # WARNING: if enabled and a CB is OPEN, the app reports DOWN.
+        # Default: false
+        # register-health-indicator: true
+
+        # Size of the circular buffer that stores CircuitBreakerEvents.
+        # Accessible via /actuator/circuitbreakerevents.
+        # Default: 100
+        # event-consumer-buffer-size: 100
+
+        # ── ADVANCED ───────────────────────────────────────────────────────
+        # When true, CallNotPermittedException (thrown when circuit is OPEN)
+        # includes the full stack trace. Set to false in production to
+        # reduce log noise and memory allocation.
+        # Default: true
+        # writable-stack-trace-enabled: true
+
+        # Custom predicate (fully-qualified class name) that evaluates
+        # whether an exception should count as a failure.
+        # Must implement Predicate<Throwable> and have a no-arg constructor.
+        # Default: throwable -> true (all exceptions are failures)
+        # record-failure-predicate: com.example.webclient.config.MyFailurePredicate
+
+        # Custom predicate (fully-qualified class name) that evaluates
+        # whether an exception should be ignored.
+        # Must implement Predicate<Throwable> and have a no-arg constructor.
+        # Default: throwable -> false (no exception is ignored)
+        # ignore-exception-predicate: com.example.webclient.config.MyIgnorePredicate
+
+# ─── SPRING BOOT ACTUATOR ─────────────────────────────────────────────────────
+#
+# Actuator exposes monitoring endpoints without writing any code.
+# With Resilience4j + Micrometer you can observe the circuit breaker state:
+#   GET /actuator/health   → includes circuitBreakers component
+#   GET /actuator/metrics/resilience4j.circuitbreaker.state → numeric state
+#   GET /actuator/metrics/resilience4j.circuitbreaker.calls → call counts
+#
+management:
+  endpoints:
+    web:
+      exposure:
+        # Only expose what is needed — never use "*" in production
+        include: health,info,metrics,caches
+  endpoint:
+    health:
+      # always          → shows details for each component (circuit breakers, disk)
+      # never           → only shows UP or DOWN
+      # when-authorized → shows details only to authenticated users (production)
+      show-details: always
+  health:
+    # Enables the Resilience4j health indicator in /actuator/health
+    circuitbreakers:
+      enabled: true
+
+# ─── ACTUATOR INFO ────────────────────────────────────────────────────────────
+# Returned by GET /actuator/info
+# Useful for knowing which version is deployed without logging into the server.
+info:
+  app:
+    name: rest-api-webclient
+    version: 1.0
+    description: "REST API exposure + WebClient + Resilience4j (Circuit Breaker + Retry)"
+  external-api:
+    url: ${EXTERNAL_API_BASE_URL:https://jsonplaceholder.typicode.com}
+
+# ─── LOGGING ──────────────────────────────────────────────────────────────────
+#
+# DEBUG in development to see retry attempts and circuit breaker state changes.
+# In production, change to INFO or WARN to reduce noise.
+#
+logging:
+  level:
+    com.example.webclient: DEBUG
+    io.github.resilience4j: DEBUG

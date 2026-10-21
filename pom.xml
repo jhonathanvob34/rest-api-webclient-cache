@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- ===============================================================
+         PARENT POM (packaging = pom)
+
+         This is a multi-module Maven project. It does not produce a JAR
+         itself; it aggregates two modules that implement the SAME REST +
+         WebClient + Resilience4j application with two different caching
+         strategies:
+
+           webclient-caffeine → in-memory cache (Caffeine), no external infra
+           webclient-redis    → distributed cache (Redis), shared across instances
+
+         The application code (@Cacheable) is identical in both modules —
+         only the cache provider dependency and configuration differ.
+         That is the whole point: Spring Cache is an abstraction.
+
+         Build everything:   mvn clean package
+         Build one module:   mvn clean package -pl webclient-redis
+    ================================================================ -->
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.2.3</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>com.example</groupId>
+    <artifactId>rest-api-webclient-cache</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
+
+    <name>rest-api-webclient-cache (parent)</name>
+    <description>REST API + WebClient + Resilience4j with two caching strategies: Caffeine and Redis</description>
+
+    <properties>
+        <java.version>17</java.version>
+        <resilience4j.version>2.2.0</resilience4j.version>
+    </properties>
+
+    <modules>
+        <module>webclient-caffeine</module>
+        <module>webclient-redis</module>
+    </modules>
+
+</project>

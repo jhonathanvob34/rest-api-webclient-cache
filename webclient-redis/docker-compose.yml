@@ -1,0 +1,39 @@
+# Redis infrastructure for the webclient-redis module.
+#
+# Usage:
+#   docker-compose up -d       -> start Redis in the background (localhost:6379)
+#   docker-compose down        -> stop Redis (data is lost, cache is ephemeral)
+#   docker-compose logs -f     -> stream Redis logs
+#
+# Services:
+#   redis       -> Redis server          (localhost:6379)
+#   redis-ui    -> Redis Commander web UI (http://localhost:8081) to inspect keys
+#
+# Once Redis is running, start the app:
+#   mvn spring-boot:run        (from the webclient-redis module)
+# Then call the endpoints twice and watch the 2nd call hit the cache.
+
+services:
+
+  redis:
+    image: redis:7-alpine
+    container_name: webclient-redis
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # Optional web UI to browse cached keys at http://localhost:8081
+  redis-ui:
+    image: rediscommander/redis-commander:latest
+    container_name: webclient-redis-ui
+    depends_on:
+      - redis
+    environment:
+      REDIS_HOSTS: local:redis:6379
+    ports:
+      - "8081:8081"
