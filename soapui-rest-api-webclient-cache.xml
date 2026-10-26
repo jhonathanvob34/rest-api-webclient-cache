@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<con:soapui-project
+        id="rest-api-webclient-cache"
+        name="REST API WebClient Cache"
+        xmlns:con="http://eviware.com/soapui/config">
+
+    <!-- ═══════════════════════════════════════════════════════════════════════
+         This SoapUI project tests the REST API exposed by BOTH modules
+         (webclient-caffeine and webclient-redis). They expose the SAME API on
+         http://localhost:8080 — only the cache backend differs.
+
+         HOW TO SEE CACHING IN ACTION:
+           Run "GET Post by Id" TWICE in a row.
+             1st call  → cache MISS → ~1000ms (hits the external API)
+             2nd call  → cache HIT  → ~10-170ms (served from cache)
+           The app logs "cache MISS" only on the first call.
+
+         Start the app first (webclient-caffeine or webclient-redis), then
+         import this file in SoapUI: File → Import Project.
+         ═══════════════════════════════════════════════════════════════════════ -->
+
+    <con:interface name="WebClientCacheService" type="rest" xmlns:con="http://eviware.com/soapui/config">
+        <con:settings/>
+        <con:endpoints>
+            <con:endpoint>http://localhost:8080</con:endpoint>
+        </con:endpoints>
+
+        <!-- ═══════════════════════════════════════════════════════════════════
+             OUR REST API — PRODUCTS  (we are the server)
+             ═══════════════════════════════════════════════════════════════════ -->
+
+        <con:resource name="products" path="/api/v1/products">
+            <con:settings/>
+            <con:method name="Create Product" method="POST">
+                <con:settings/>
+
+                <!-- Valid product → 201 Created -->
+                <con:request name="Create Product (valid)" mediaType="application/json">
+                    <con:settings/>
+                    <con:endpoint>http://localhost:8080</con:endpoint>
+                    <con:request>{"name":"Laptop","category":"Electronics","price":999.99,"stock":50}</con:request>
+                    <con:credentials/>
+                    <con:httpHeaders>
+                        <con:entry key="Content-Type" value="application/json"/>
+                        <con:entry key="Accept" value="application/json"/>
+                    </con:httpHeaders>
+                </con:request>
+
+                <!-- Invalid product (price <= 0, blank name) → 400 Bad Request (validation) -->
+                <con:request name="Create Product (invalid - 400)" mediaType="application/json">
+                    <con:settings/>
+                    <con:endpoint>http://localhost:8080</con:endpoint>
+                    <con:request>{"name":"","category":"Electronics","price":-5,"stock":-1}</con:request>
+                    <con:credentials/>
+                    <con:httpHeaders>
+                        <con:entry key="Content-Type" value="application/json"/>
+                        <con:entry key="Accept" value="application/json"/>
+                    </con:httpHeaders>
+                </con:request>
+
+            </con:method>
+        </con:resource>
+
+        <con:resource name="products-ping" path="/api/v1/products/ping">
+            <con:settings/>
+            <con:method name="Ping" method="GET">
+                <con:settings/>
+                <con:request name="GET Ping (liveness)" mediaType="application/json">
+                    <con:settings/>
+                    <con:endpoint>http://localhost:8080</con:endpoint>
+                    <con:request/>
+                    <con:credentials/>
+                    <con:httpHeaders>
+                        <con:entry key="Accept" value="application/json"/>
+                    </con:httpHeaders>
+                </con:request>
+            </con:method>
+        </con:resource>
+
+        <!-- ═══════════════════════════════════════════════════════════════════
+             EXTERNAL API PROXY — POSTS  (we are the client: WebClient + cache)
+             ═══════════════════════════════════════════════════════════════════ -->
+
+        <con:resource name="posts" path="/api/v1/posts">
+            <con:settings/>
+            <con:method name="Get All Posts" method="GET">
+                <con:settings/>
+                <con:request name="GET All Posts (cached)" mediaType="application/json">
+                    <con:settings/>
+                    <con:endpoint>http://localhost:8080</con:endpoint>
+                    <con:request/>
+                    <con:credentials/>
+                    <con:httpHeaders>
+                        <con:entry key="Accept" value="application/json"/>
+                    </con:httpHeaders>
+                </con:request>
+            </con:method>
+        </con:resource>
+
+        <con:resource name="post-by-id" path="/api/v1/posts/1">
+            <con:settings/>
+            <con:method name="Get Post by Id" method="GET">
+                <con:settings/>
+
+                <!-- Run this request TWICE: 1st = cache MISS (~1s), 2nd = cache HIT (fast) -->
+                <con:request name="GET Post by Id (run twice to see cache)" mediaType="application/json">
+                    <con:settings/>
+                    <con:endpoint>http://localhost:8080</con:endpoint>
+                    <con:request/>
+                    <con:credentials/>
+                    <con:httpHeaders>
+                        <con:entry key="Accept" value="application/json"/>
+                    </con:httpHeaders>
+                </con:request>
+            </con:method>
+        </con:resource>
+
+        <!-- ═══════════════════════════════════════════════════════════════════
+             ACTUATOR  →  http://localhost:8080/actuator
+             ═══════════════════════════════════════════════════════════════════ -->
+
+        <con:resource name="health" path="/actuator/health">
+            <con:settings/>
+            <con:method name="Health" method="GET">
+                <con:settings/>
+                <con:request name="GET Health (+ circuit breaker state)" mediaType="application/json">
+                    <con:settings/>
+                    <con:endpoint>http://localhost:8080</con:endpoint>
+                    <con:request/>
+                    <con:credentials/>
+                    <con:httpHeaders>
+                        <con:entry key="Accept" value="application/json"/>
+                    </con:httpHeaders>
+                </con:request>
+            </con:method>
+        </con:resource>
+
+        <con:resource name="caches" path="/actuator/caches">
+            <con:settings/>
+            <con:method name="Caches" method="GET">
+                <con:settings/>
+                <con:request name="GET Caches (posts, postById)" mediaType="application/json">
+                    <con:settings/>
+                    <con:endpoint>http://localhost:8080</con:endpoint>
+                    <con:request/>
+                    <con:credentials/>
+                    <con:httpHeaders>
+                        <con:entry key="Accept" value="application/json"/>
+                    </con:httpHeaders>
+                </con:request>
+            </con:method>
+        </con:resource>
+
+        <con:resource name="metrics" path="/actuator/metrics">
+            <con:settings/>
+            <con:method name="Metrics" method="GET">
+                <con:settings/>
+                <con:request name="GET Metrics" mediaType="application/json">
+                    <con:settings/>
+                    <con:endpoint>http://localhost:8080</con:endpoint>
+                    <con:request/>
+                    <con:credentials/>
+                    <con:httpHeaders>
+                        <con:entry key="Accept" value="application/json"/>
+                    </con:httpHeaders>
+                </con:request>
+            </con:method>
+        </con:resource>
+
+    </con:interface>
+
+</con:soapui-project>
