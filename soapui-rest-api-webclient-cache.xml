@@ -1,8 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<con:soapui-project
-        id="rest-api-webclient-cache"
-        name="REST API WebClient Cache"
-        xmlns:con="http://eviware.com/soapui/config">
+<con:soapui-project id="rest-api-webclient-cache" name="REST API WebClient Cache" activeEnvironment="Default" abortOnError="false" runType="SEQUENTIAL" soapui-version="5.10.0" xmlns:con="http://eviware.com/soapui/config">
 
     <!-- ═══════════════════════════════════════════════════════════════════════
          This SoapUI project tests the REST API exposed by BOTH modules
@@ -19,9 +16,9 @@
          import this file in SoapUI: File → Import Project.
          ═══════════════════════════════════════════════════════════════════════ -->
 
-    <con:interface name="WebClientCacheService" type="rest" xmlns:con="http://eviware.com/soapui/config">
+    <con:settings/><con:interface name="WebClientCacheService" type="rest" xsi:type="con:RestService" id="84f2e876-8af1-437d-b169-0943b8e4bdd7" wadlVersion="http://wadl.dev.java.net/2009/02" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
         <con:settings/>
-        <con:endpoints>
+        <con:definitionCache/><con:endpoints>
             <con:endpoint>http://localhost:8080</con:endpoint>
         </con:endpoints>
 
@@ -29,13 +26,13 @@
              OUR REST API — PRODUCTS  (we are the server)
              ═══════════════════════════════════════════════════════════════════ -->
 
-        <con:resource name="products" path="/api/v1/products">
+        <con:resource name="products" path="/api/v1/products" id="4f0c5d2e-aab8-4a8a-91cd-c5c29ba06c15">
             <con:settings/>
-            <con:method name="Create Product" method="POST">
+            <con:parameters/><con:method name="Create Product" method="POST" id="6094e643-6b2c-4b97-a53e-46abf7314ebc">
                 <con:settings/>
 
                 <!-- Valid product → 201 Created -->
-                <con:request name="Create Product (valid)" mediaType="application/json">
+                <con:parameters/><con:request name="Create Product (valid)" mediaType="application/json" id="47e6aa13-a98e-4ba9-b138-e5d4855e5fe2">
                     <con:settings/>
                     <con:endpoint>http://localhost:8080</con:endpoint>
                     <con:request>{"name":"Laptop","category":"Electronics","price":999.99,"stock":50}</con:request>
@@ -44,10 +41,10 @@
                         <con:entry key="Content-Type" value="application/json"/>
                         <con:entry key="Accept" value="application/json"/>
                     </con:httpHeaders>
-                </con:request>
+                <con:parameters/></con:request>
 
                 <!-- Invalid product (price <= 0, blank name) → 400 Bad Request (validation) -->
-                <con:request name="Create Product (invalid - 400)" mediaType="application/json">
+                <con:request name="Create Product (invalid - 400)" mediaType="application/json" id="9b6718a9-0091-406a-8ac9-890a4f3d4d20">
                     <con:settings/>
                     <con:endpoint>http://localhost:8080</con:endpoint>
                     <con:request>{"name":"","category":"Electronics","price":-5,"stock":-1}</con:request>
@@ -56,16 +53,16 @@
                         <con:entry key="Content-Type" value="application/json"/>
                         <con:entry key="Accept" value="application/json"/>
                     </con:httpHeaders>
-                </con:request>
+                <con:parameters/></con:request>
 
             </con:method>
         </con:resource>
 
-        <con:resource name="products-ping" path="/api/v1/products/ping">
+        <con:resource name="products-ping" path="/api/v1/products/ping" id="efaa62f3-c327-4fa0-aa8d-1f5aae844ab7">
             <con:settings/>
-            <con:method name="Ping" method="GET">
+            <con:parameters/><con:method name="Ping" method="GET" id="47b2bd11-ac53-4e9b-9a09-b66d035cc443">
                 <con:settings/>
-                <con:request name="GET Ping (liveness)" mediaType="application/json">
+                <con:parameters/><con:request name="GET Ping (liveness)" mediaType="application/json" id="d03bfeab-ff00-40ff-bbef-447b5e040b78">
                     <con:settings/>
                     <con:endpoint>http://localhost:8080</con:endpoint>
                     <con:request/>
@@ -73,7 +70,7 @@
                     <con:httpHeaders>
                         <con:entry key="Accept" value="application/json"/>
                     </con:httpHeaders>
-                </con:request>
+                <con:parameters/></con:request>
             </con:method>
         </con:resource>
 
@@ -81,11 +78,11 @@
              EXTERNAL API PROXY — POSTS  (we are the client: WebClient + cache)
              ═══════════════════════════════════════════════════════════════════ -->
 
-        <con:resource name="posts" path="/api/v1/posts">
+        <con:resource name="posts" path="/api/v1/posts" id="a8158f57-2c83-4ddc-9967-64cb317fc735">
             <con:settings/>
-            <con:method name="Get All Posts" method="GET">
+            <con:parameters/><con:method name="Get All Posts" method="GET" id="64a66cb8-83ca-41c4-9374-db899c45f916">
                 <con:settings/>
-                <con:request name="GET All Posts (cached)" mediaType="application/json">
+                <con:parameters/><con:request name="GET All Posts (cached)" mediaType="application/json" id="2f600042-edb8-4203-8160-034ae3435f0a">
                     <con:settings/>
                     <con:endpoint>http://localhost:8080</con:endpoint>
                     <con:request/>
@@ -93,25 +90,25 @@
                     <con:httpHeaders>
                         <con:entry key="Accept" value="application/json"/>
                     </con:httpHeaders>
-                </con:request>
+                <con:parameters/></con:request>
             </con:method>
         </con:resource>
 
-        <con:resource name="post-by-id" path="/api/v1/posts/1">
+        <con:resource name="post-by-id" path="/api/v1/posts/1" id="c170e45e-b672-4942-a5eb-54ff0bc3a3ab">
             <con:settings/>
-            <con:method name="Get Post by Id" method="GET">
+            <con:parameters/><con:method name="Get Post by Id" method="GET" id="8bd2441c-85c4-4d90-b44b-c12f0440f0a1">
                 <con:settings/>
 
                 <!-- Run this request TWICE: 1st = cache MISS (~1s), 2nd = cache HIT (fast) -->
-                <con:request name="GET Post by Id (run twice to see cache)" mediaType="application/json">
-                    <con:settings/>
+                <con:parameters/><con:representation type="RESPONSE"><con:mediaType>application/json</con:mediaType><con:status>200</con:status><con:params/><con:element xmlns:ns="http://localhost/api/v1/posts/1">ns:Response</con:element></con:representation><con:request name="GET Post by Id (run twice to see cache)" mediaType="application/json" id="e8b351a0-5628-4454-8b77-4f408eb2ee8a">
+                    <con:settings><con:setting id="com.eviware.soapui.impl.wsdl.WsdlRequest@request-headers">&lt;xml-fragment/></con:setting></con:settings>
                     <con:endpoint>http://localhost:8080</con:endpoint>
                     <con:request/>
-                    <con:credentials/>
+                    <con:originalUri>http://localhost/api/v1/posts/1</con:originalUri><con:credentials><con:authType>No Authorization</con:authType></con:credentials>
                     <con:httpHeaders>
                         <con:entry key="Accept" value="application/json"/>
                     </con:httpHeaders>
-                </con:request>
+                <con:jmsConfig JMSDeliveryMode="PERSISTENT"/><con:jmsPropertyConfig/><con:parameters/></con:request>
             </con:method>
         </con:resource>
 
@@ -119,11 +116,11 @@
              ACTUATOR  →  http://localhost:8080/actuator
              ═══════════════════════════════════════════════════════════════════ -->
 
-        <con:resource name="health" path="/actuator/health">
+        <con:resource name="health" path="/actuator/health" id="4f6099b7-e2a8-48dd-aa18-d758255567ec">
             <con:settings/>
-            <con:method name="Health" method="GET">
+            <con:parameters/><con:method name="Health" method="GET" id="833c4758-7cf1-4bdc-9831-50457360af6b">
                 <con:settings/>
-                <con:request name="GET Health (+ circuit breaker state)" mediaType="application/json">
+                <con:parameters/><con:request name="GET Health (+ circuit breaker state)" mediaType="application/json" id="dbe22292-95b2-41f0-a09b-b92fd9522f12">
                     <con:settings/>
                     <con:endpoint>http://localhost:8080</con:endpoint>
                     <con:request/>
@@ -131,15 +128,15 @@
                     <con:httpHeaders>
                         <con:entry key="Accept" value="application/json"/>
                     </con:httpHeaders>
-                </con:request>
+                <con:parameters/></con:request>
             </con:method>
         </con:resource>
 
-        <con:resource name="caches" path="/actuator/caches">
+        <con:resource name="caches" path="/actuator/caches" id="cfed7c3c-9305-411d-9357-aa22349b3159">
             <con:settings/>
-            <con:method name="Caches" method="GET">
+            <con:parameters/><con:method name="Caches" method="GET" id="bae5b413-06e5-4f27-a703-b4abcf12d49f">
                 <con:settings/>
-                <con:request name="GET Caches (posts, postById)" mediaType="application/json">
+                <con:parameters/><con:request name="GET Caches (posts, postById)" mediaType="application/json" id="e1729237-39bb-48de-bba7-3f01eb43b0dc">
                     <con:settings/>
                     <con:endpoint>http://localhost:8080</con:endpoint>
                     <con:request/>
@@ -147,15 +144,15 @@
                     <con:httpHeaders>
                         <con:entry key="Accept" value="application/json"/>
                     </con:httpHeaders>
-                </con:request>
+                <con:parameters/></con:request>
             </con:method>
         </con:resource>
 
-        <con:resource name="metrics" path="/actuator/metrics">
+        <con:resource name="metrics" path="/actuator/metrics" id="1eb19a88-4b21-4463-b9d2-d51848683b04">
             <con:settings/>
-            <con:method name="Metrics" method="GET">
+            <con:parameters/><con:method name="Metrics" method="GET" id="bf3b48b0-829c-4c73-8ab8-fde0755f4aa6">
                 <con:settings/>
-                <con:request name="GET Metrics" mediaType="application/json">
+                <con:parameters/><con:request name="GET Metrics" mediaType="application/json" id="62b0f35a-97c9-41e4-a22e-c02a658604f0">
                     <con:settings/>
                     <con:endpoint>http://localhost:8080</con:endpoint>
                     <con:request/>
@@ -163,10 +160,133 @@
                     <con:httpHeaders>
                         <con:entry key="Accept" value="application/json"/>
                     </con:httpHeaders>
-                </con:request>
+                <con:parameters/></con:request>
+            </con:method>
+        </con:resource>
+
+        <!-- ═══════════════════════════════════════════════════════════════════
+             CACHE METRICS  →  http://localhost:8080/actuator/metrics/{metric}
+             ───────────────────────────────────────────────────────────────────
+             Caffeine lives INSIDE the JVM heap, so there is no external tool to
+             browse its contents (unlike Redis + redis-cli). Instead, Spring Boot
+             Actuator exposes Caffeine's statistics as Micrometer metrics, because
+             the cache spec in application.yml enables them:
+
+                 caffeine.spec: maximumSize=500,expireAfterWrite=60s,recordStats
+                                                                      ^^^^^^^^^^^
+
+             HOW MICROMETER TAGS WORK (important!):
+               A metric like cache.gets is split into dimensions called TAGS.
+               The relevant tags for a Caffeine cache are:
+                 name:postById   → which cache (from @Cacheable("postById"))
+                 result:hit      → reads served FROM the cache  (no HTTP call)
+                 result:miss     → reads that MISSED and went to the network
+
+               If you filter by ONLY name:postById, Micrometer AGGREGATES hit+miss
+               into a single number (that is why you saw value=2 and not the split).
+               To see them SEPARATELY you must add a SECOND tag, e.g.:
+
+                 /actuator/metrics/cache.gets?tag=name:postById&tag=result:miss
+                 /actuator/metrics/cache.gets?tag=name:postById&tag=result:hit
+
+               Because SoapUI collapses duplicate query-param keys, the two tags
+               are written directly into each resource PATH below so BOTH are sent.
+
+             HOW TO SEE THE CACHE WORK (hit vs miss):
+               1. Run "cache.gets MISS" and "cache.gets HIT" → note both numbers.
+               2. Run "GET Post by Id" (post-by-id resource) TWICE.
+               3. Run both metric requests AGAIN → compare:
+                    MISS increased by 1  (the 1st call → went to the network)
+                    HIT  increased by 1  (the 2nd call → served from the cache)
+
+             NOTE: these metrics show COUNTS and SIZE only. Caffeine does NOT
+             expose the actual cached keys/values through Actuator by design.
+             To inspect real contents you need the Redis module (redis-cli).
+             ═══════════════════════════════════════════════════════════════════ -->
+
+        <!-- cache.gets filtered to result:MISS — reads that went to the network -->
+        <con:resource name="cache-gets-miss" path="/actuator/metrics/cache.gets?tag=name:postById&amp;tag=result:miss" id="fb9f9a34-bbd8-4613-96c3-5644094fc675">
+            <con:settings/>
+            <con:parameters/><con:method name="Cache Gets MISS" method="GET" id="859b7147-5486-4168-a2d7-adcc0dc9f4f9">
+                <con:settings/>
+                <!-- value = number of cache MISSES for the postById cache.
+                     A MISS means the post was NOT in the cache, so the app had
+                     to call the external API. Increases by 1 the FIRST time you
+                     request a given post id (or after it expired at 60s). -->
+                <con:parameters/><con:representation type="RESPONSE"><con:mediaType>application/vnd.spring-boot.actuator.v3+json</con:mediaType><con:status>200</con:status><con:params/><con:element xmlns:cac="http://localhost/actuator/metrics/cache.gets">cac:Response</con:element></con:representation><con:request name="GET cache.gets MISS (postById)" mediaType="application/json" id="dffb0950-b728-49e9-ab26-1a7e1fee7f67">
+                    <con:settings><con:setting id="com.eviware.soapui.impl.wsdl.WsdlRequest@request-headers">&lt;xml-fragment/></con:setting></con:settings>
+                    <con:endpoint>http://localhost:8080</con:endpoint>
+                    <con:request/>
+                    <con:originalUri>http://localhost/actuator/metrics/cache.gets</con:originalUri><con:credentials><con:authType>No Authorization</con:authType></con:credentials>
+                    <con:httpHeaders>
+                        <con:entry key="Accept" value="application/json"/>
+                    </con:httpHeaders>
+                <con:jmsConfig JMSDeliveryMode="PERSISTENT"/><con:jmsPropertyConfig/><con:parameters/></con:request>
+            </con:method>
+        </con:resource>
+
+        <!-- cache.gets filtered to result:HIT — reads served from the cache -->
+        <con:resource name="cache-gets-hit" path="/actuator/metrics/cache.gets?tag=name:postById&amp;tag=result:hit" id="59a9f199-283c-45db-92ac-f7e3d72e07b7">
+            <con:settings/>
+            <con:parameters/><con:method name="Cache Gets HIT" method="GET" id="c131fec0-33bd-4635-962d-b6752c6fca72">
+                <con:settings/>
+                <!-- value = number of cache HITS for the postById cache.
+                     A HIT means the post WAS already cached, so NO HTTP call was
+                     made (fast, ~10ms). Increases by 1 every time you re-request
+                     a post id that is already in the cache. -->
+                <con:parameters/><con:representation type="RESPONSE"><con:mediaType>application/vnd.spring-boot.actuator.v3+json</con:mediaType><con:status>200</con:status><con:params/><con:element xmlns:cac="http://localhost/actuator/metrics/cache.gets">cac:Response</con:element></con:representation><con:representation type="RESPONSE"><con:mediaType xsi:nil="true"/><con:status>0</con:status><con:params/><con:element>data</con:element></con:representation><con:request name="GET cache.gets HIT (postById)" mediaType="application/json" id="99fd33f5-7816-4ace-bcdf-1f3216e02b87">
+                    <con:settings><con:setting id="com.eviware.soapui.impl.wsdl.WsdlRequest@request-headers">&lt;xml-fragment/></con:setting></con:settings>
+                    <con:endpoint>http://localhost:8080</con:endpoint>
+                    <con:request/>
+                    <con:originalUri>http://localhost/actuator/metrics/cache.gets</con:originalUri><con:credentials><con:authType>No Authorization</con:authType></con:credentials>
+                    <con:httpHeaders>
+                        <con:entry key="Accept" value="application/json"/>
+                    </con:httpHeaders>
+                <con:jmsConfig JMSDeliveryMode="PERSISTENT"/><con:jmsPropertyConfig/><con:parameters/></con:request>
+            </con:method>
+        </con:resource>
+
+        <!-- cache.size — current number of entries in the postById cache -->
+        <con:resource name="cache-size" path="/actuator/metrics/cache.size?tag=name:postById" id="8d9ea4a1-1dd7-46b4-ad4b-c1c3c88d638e">
+            <con:settings/>
+            <con:parameters/><con:method name="Cache Size" method="GET" id="8caae8ab-2e09-41d1-990e-9dffb0d08c91">
+                <con:settings/>
+                <!-- Current number of entries stored in the postById cache.
+                     Starts at 0; increases by 1 each time a NEW post id is
+                     cached (a MISS). Repeating the same id does NOT grow it.
+                     Entries disappear after expireAfterWrite=60s. -->
+                <con:parameters/><con:request name="GET cache.size (postById)" mediaType="application/json" id="369dd160-842c-4543-94a1-ae7163a71fcd">
+                    <con:settings/>
+                    <con:endpoint>http://localhost:8080</con:endpoint>
+                    <con:request/>
+                    <con:credentials/>
+                    <con:httpHeaders>
+                        <con:entry key="Accept" value="application/json"/>
+                    </con:httpHeaders>
+                <con:parameters/></con:request>
+            </con:method>
+        </con:resource>
+
+        <!-- cache.puts — number of writes into the postById cache -->
+        <con:resource name="cache-puts" path="/actuator/metrics/cache.puts?tag=name:postById" id="b4ca0783-da30-40d8-85bb-b2996212c670">
+            <con:settings/>
+            <con:parameters/><con:method name="Cache Puts" method="GET" id="4a8bbca7-b673-4b80-ba56-3165b577157a">
+                <con:settings/>
+                <!-- Number of times a value was WRITTEN into the cache.
+                     Increases by 1 on every MISS (when a fresh value from the
+                     external API is stored). A HIT does NOT increase it. -->
+                <con:parameters/><con:request name="GET cache.puts (postById)" mediaType="application/json" id="2cbeb7c9-d88e-410d-9096-1f0ee4a8a964">
+                    <con:settings/>
+                    <con:endpoint>http://localhost:8080</con:endpoint>
+                    <con:request/>
+                    <con:credentials/>
+                    <con:httpHeaders>
+                        <con:entry key="Accept" value="application/json"/>
+                    </con:httpHeaders>
+                <con:parameters/></con:request>
             </con:method>
         </con:resource>
 
     </con:interface>
 
-</con:soapui-project>
+<con:properties/><con:wssContainer/><con:oAuth2ProfileContainer/><con:oAuth1ProfileContainer/></con:soapui-project>
